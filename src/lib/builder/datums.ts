@@ -141,6 +141,8 @@ export function decodeBidDatum(datum: any) {
     return undefined;
   }
 
+  if( Number( data.constr ) !== 2 ) return undefined;
+
   const fields = data.fields;
 
   const proposalRef = utxoRefFromData( fields[0] );
@@ -179,9 +181,12 @@ export function decodeUnkownBidDatum(datum: any) {
     return undefined;
   }
 
+  if( Number( data.constr ) !== 1 ) return undefined;
+
   const fields = data.fields;
 
   const proposalRef = utxoRefFromData( fields[0] );
+
   if(!(fields[1] instanceof DataB)) return undefined;
   const hash = decodeHex((fields[1]).bytes.toString());
 
