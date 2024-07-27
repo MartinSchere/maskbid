@@ -74,7 +74,7 @@ export function createUnknownBidDatum(
 
 export function hashDatum(datum: Data) {
   const cbor = Data.to(datum);
-  return toHex(sha2_256(fromHex(cbor)));
+  return toHex(sha2_256(dataToCbor(dataFromCbor(cbor)).toBuffer()));
 }
 
 function utxoRefToData(utxoRef: string) {

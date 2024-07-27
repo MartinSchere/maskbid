@@ -1,9 +1,38 @@
-import { contractAddr, contractBytes, contractScript } from "@/pluts_contracts/contract";
-import { WalletApi as LucidWalletApi, Data, toHex, UTxO, applyDoubleCborEncoding, unixTimeToEnclosingSlot, SLOT_CONFIG_NETWORK } from "lucid-cardano";
+import {
+  contractAddr,
+  contractBytes,
+  contractScript,
+} from "@/pluts_contracts/contract";
+import {
+  WalletApi as LucidWalletApi,
+  Data,
+  toHex,
+  UTxO,
+  applyDoubleCborEncoding,
+  unixTimeToEnclosingSlot,
+  SLOT_CONFIG_NETWORK,
+  C,
+  fromHex,
+} from "lucid-cardano";
 import { getLucid } from "../lucid";
 import { WalletApi } from "use-cardano-wallet";
-import { createProposalDatum, createUnknownBidDatum } from "./datums";
-import { Address, DataI, defaultProtocolParameters, forceData, hoistedToStr, UTxO as PlutsUTxO, TxBuilder, unit, Value } from "@harmoniclabs/plu-ts";
+import {
+  createProposalDatum,
+  createUnknownBidDatum,
+  hashDatum,
+  hiddenBidUtxoToHiddenBid,
+} from "./datums";
+import {
+  Address,
+  DataI,
+  defaultProtocolParameters,
+  forceData,
+  hoistedToStr,
+  UTxO as PlutsUTxO,
+  TxBuilder,
+  unit,
+  Value,
+} from "@harmoniclabs/plu-ts";
 import { UtxoWithSlot } from "@maestro-org/typescript-sdk";
 import { utxoWithSlotToUtxo } from "../utils";
 
@@ -98,90 +127,92 @@ export async function createRevealedBid(
 
   const bidData = localStorage.getItem(bidHash);
 
+  // 0b050b54e913bdad76fd54552ffe5e65c18ec75268fc1b62af8d66a5dad4e88e
+  // const result = hashDatum(Data.from(bidData))
+  // console.log("Produced: ", result)
+
+  // throw new Error("" + bidHash);
+
   if (typeof bidData !== "string")
     throw new Error("unknown bid for hash: " + bidHash);
 
+  const txBuilder = new TxBuilder(defaultProtocolParameters, {
+    slotLengthInMilliseconds: 1000,
+    systemStartPOSIX:
+      SLOT_CONFIG_NETWORK.Preprod.zeroTime +
+      SLOT_CONFIG_NETWORK.Preprod.zeroSlot * 1000,
+  });
 
-  const txBuilder = new TxBuilder( defaultProtocolParameters );
+  const utxos = (await lucid.wallet.getUtxos())
+    .filter((u) => u.address !== contractAddr)
+    .toSorted((a, b) => Number(b.assets.lovelace - a.assets.lovelace));
 
-  let _tx = txBuilder.buildSync({
-    inputs: [
-      {
-        utxo: luxidToPlutsUtxo( hiddenBidUtxo ),
-        inputScript: {
-          datum: "inline",
-          redeemer: new DataI( 0 ),
-          script: contractScript
-        }
-      }
-    ],
-    collaterals: [
-      luxidToPlutsUtxo(
-        (await lucid.wallet.getUtxos())
-        .filter(
-          u => {
-            const units = Object.keys( u.assets );
-            if( units.length !== 1 ) return false;
-            if( units[0] !== "lovelace" ) return false;
-            if( (u.assets as any).lovelace >= 2_000_000 ) return false;
-  
-            return true
-          }
-        )[0]
-      )
-    ],
-    readonlyRefInputs: [
-      luxidToPlutsUtxo( resolvedProposalRef )
-    ],
-    invalidBefore: unixTimeToEnclosingSlot(Date.now(), SLOT_CONFIG_NETWORK.Preprod ),
-    outputs: [
-      {
-        address: Address.fromString( contractAddr ),
-        value: Value.lovelaces( 2_000_000 ),
-        datum: forceData( bidData ) 
-      }
-    ]
-  })
+  const hiddenBid = hiddenBidUtxoToHiddenBid(hiddenBidUtxo);
+  hiddenBid?.hash;
 
-
-  const tx = await lucid
-    .newTx()
-    .attachSpendingValidator({
-      type: "PlutusV2",
-      script: applyDoubleCborEncoding(toHex(contractBytes)),
+  const tx = txBuilder
+    .buildSync({
+      inputs: [
+        {
+          utxo: luxidToPlutsUtxo(utxoWithSlotToUtxo(hiddenBidUtxo)),
+          inputScript: {
+            datum: "inline",
+            redeemer: new DataI(0),
+            script: contractScript,
+          },
+        },
+        {
+          utxo: luxidToPlutsUtxo(utxos[1]),
+        },
+      ],
+      changeAddress: Address.fromString(await lucid.wallet.address()),
+      collaterals: [
+        luxidToPlutsUtxo(
+          (await lucid.wallet.getUtxos()).filter((u) => {
+            return Object.keys(u.assets).length === 1;
+            //   const units = Object.keys(u.assets);
+            //   if (units.length !== 1) return false;
+            //   if (units[0] !== "lovelace") return false;
+            //   if (u.assets.lovelace >= BigInt(2_000_000)) return false;
+          })[0]
+        ),
+      ],
+      readonlyRefInputs: [luxidToPlutsUtxo(resolvedProposalRef[0])],
+      invalidBefore: unixTimeToEnclosingSlot(
+        Date.now(),
+        SLOT_CONFIG_NETWORK.Preprod
+      ),
+      outputs: [
+        {
+          address: Address.fromString(contractAddr),
+          value: Value.lovelaces(6_137_796),
+          datum: forceData(bidData),
+        },
+      ],
     })
-    .readFrom(resolvedProposalRef)
-    .validFrom(+new Date())
-    .collectFrom(
-      [utxoWithSlotToUtxo(hiddenBidUtxo)],
-      Data.void() // unused redeemer
-    )
-    .payToContract(
-      contractAddr,
-      {
-        inline: Data.to(bidData),
-      },
-      {
-        lovelace: BigInt(0),
-      }
-    )
-    .complete()
-    .then((txComplete) => txComplete.sign().complete());
+    .toCbor()
+    .toString();
 
-  return tx.submit();
+  const lucidTx = await lucid.fromTx(tx).sign().complete();
+
+  return lucidTx.submit();
 }
 
-export function luxidToPlutsUtxo( hiddenBidUtxo: any ): PlutsUTxO
-{
+export function luxidToPlutsUtxo(hiddenBidUtxo: UTxO): PlutsUTxO {
   return new PlutsUTxO({
     utxoRef: {
-      id: hiddenBidUtxo.tx_hash,
-      index: hiddenBidUtxo.index
+      id: hiddenBidUtxo.txHash,
+      index: hiddenBidUtxo.outputIndex,
     },
     resolved: {
-      address: Address.fromString( hiddenBidUtxo.address ),
-      value: Value.fromUnits( hiddenBidUtxo.assets as any ),
-      datum: forceData( hiddenBidUtxo.datum?.bytes! )
-    }
-  })
+      address: Address.fromString(hiddenBidUtxo.address),
+      value: Value.fromUnits(
+        Object.entries(hiddenBidUtxo.assets).map(([unit, amount]) => ({
+          unit,
+          quantity: BigInt(amount),
+        }))
+      ),
+      datum: hiddenBidUtxo.datum ? forceData(hiddenBidUtxo.datum!) : undefined,
+    },
+  });
 }
