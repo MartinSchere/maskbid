@@ -35,7 +35,7 @@ const privateTender = pfn([
                         .eq( ownAddr.credential )
                     ).tail.tail
                 )
-            )
+            );
 
             // inlined
             const bidInputIdx = punIData.$( rdmr );
@@ -166,3 +166,5 @@ export const contractScript = new Script(
     ScriptType.PlutusV2,
     contractBytes
 );
+
+export const contractCbor = contractScript.toCbor().toBuffer();
