@@ -1,4 +1,4 @@
-import { compile, data, int, passert, pBool, pBSToData, perror, pfn, pisEmpty, plet, pmatch, PScriptContext, pserialiseData, psha2_256, PTxOut, punBData, punIData, punsafeConvertType, Script, ScriptType, unit } from "@harmoniclabs/plu-ts";
+import { Address, compile, data, int, passert, pBool, pBSToData, PaymentCredentials, perror, pfn, pisEmpty, plet, pmatch, PScriptContext, pserialiseData, psha2_256, PTxOut, punBData, punIData, punsafeConvertType, Script, ScriptType, unit } from "@harmoniclabs/plu-ts";
 import { BID_CTOR_IDX, MockBid, MockProposal, PrivateTenderDatum } from "./PrivateTenderDatum";
 import { BidAction } from "./BidAction";
 import { plovelaces } from "./plovelaces";
@@ -166,5 +166,9 @@ export const contractScript = new Script(
     ScriptType.PlutusV2,
     contractBytes
 );
+
+export const contractHash = contractScript.hash.toBuffer();
+
+export const contractAddr = Address.testnet( PaymentCredentials.script( contractHash ) ).toString();
 
 export const contractCbor = contractScript.toCbor().toBuffer();
