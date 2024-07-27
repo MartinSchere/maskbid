@@ -28,6 +28,9 @@ export const PrivateTenderDatum = pstruct({
     proposedAmount: int,
     bidderAddr: PAddress.type,
     salt: bs, // anti brute force
+    // additional for offchain
+    title: bs,
+    description: bs
   },
 });
 
