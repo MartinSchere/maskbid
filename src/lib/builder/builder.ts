@@ -30,8 +30,10 @@ import {
   hoistedToStr,
   UTxO as PlutsUTxO,
   TxBuilder,
+  TxWitnessSet,
   unit,
   Value,
+  VKeyWitness,
 } from "@harmoniclabs/plu-ts";
 import { UtxoWithSlot } from "@maestro-org/typescript-sdk";
 import { utxoWithSlotToUtxo } from "../utils";
@@ -189,13 +191,30 @@ export async function createRevealedBid(
           datum: forceData(bidData),
         },
       ],
-    })
-    .toCbor()
-    .toString();
+    });
 
-  const lucidTx = await lucid.fromTx(tx).sign().complete();
+    console.log(
+      JSON.stringify(
+        tx.toJson(),
+        undefined,
+        2
+      )
+    );
 
-  return lucidTx.submit();
+  const txStr = tx
+  .toCbor()
+  .toString();
+
+  const witnesses = TxWitnessSet.fromCbor(
+    await api.signTx( txStr, true )
+  );
+
+  for( const vk of witnesses.vkeyWitnesses ?? [] )
+  {
+    tx.addVKeyWitness( vk );
+  }
+
+  await lucid.provider.submitTx( tx.toCbor().toString() );
 }
 
 export function luxidToPlutsUtxo(hiddenBidUtxo: UTxO): PlutsUTxO {
