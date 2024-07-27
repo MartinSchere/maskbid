@@ -132,6 +132,57 @@ export function decodeProposalDatum(datum: any) {
   };
 }
 
+export function decodeBidDatum(datum: any) {
+  if (!canBeData(datum)) return undefined;
+
+  const data = forceData(datum);
+
+  if (!(data instanceof DataConstr)) {
+    return undefined;
+  }
+
+  const fields = data.fields;
+
+  const proposalRef = utxoRefFromData( fields[0] );
+  const proposedAmount = Number((fields[1] as DataI).int);
+  const bidderAddr = addressFromPlutsData(fields[2]);
+  if (typeof bidderAddr !== "string") return undefined;
+  
+  const salt = (fields[3] as DataB).toString();
+
+  const title = decodeHex((fields[4] as DataB).bytes.toString());
+  const description = decodeHex((fields[5] as DataB).bytes.toString());
+
+  return {
+    proposalRef,
+    proposedAmount,
+    bidderAddr,
+    salt,
+    title,
+    description,
+  };
+}
+
+export function utxoRefFromData( data: PlutsData )
+{
+  if(!( data instanceof DataConstr )) return undefined;
+  
+  const [ idConstr, idx ] = data.fields;
+  if(!(idConstr instanceof DataConstr)) return undefined;
+
+  const [ wrappedId ] = idConstr.fields;
+  if(!( wrappedId instanceof DataConstr )) return undefined;
+
+  const [ idData ] = wrappedId.fields;
+  if(!(idData instanceof DataB)) return undefined;
+  if(!(idx instanceof DataI)) return undefined;
+
+  return {
+    id: idData.bytes.toString(),
+    idx: Number( idx.int )
+  };
+}
+
 export function addressFromPlutsData(data: PlutsData) {
   if (!(data instanceof DataConstr)) return undefined;
   const [pay, stake] = data.fields;
