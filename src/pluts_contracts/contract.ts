@@ -173,4 +173,4 @@ export const contractHash = contractScript.hash.toBuffer();
 
 export const contractAddr = Address.testnet( PaymentCredentials.script( contractHash ) ).toString();
 
-export const contractCbor = contractScript.toCbor().toBuffer();
+export const contractCbor = contractScript.cbor.toBuffer();
