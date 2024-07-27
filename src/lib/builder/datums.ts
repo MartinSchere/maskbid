@@ -144,14 +144,21 @@ export function decodeBidDatum(datum: any) {
   const fields = data.fields;
 
   const proposalRef = utxoRefFromData( fields[0] );
-  const proposedAmount = Number((fields[1] as DataI).int);
+  
+  if(!(fields[1] instanceof DataI)) return undefined;
+  const proposedAmount = Number(fields[1].int);
+
   const bidderAddr = addressFromPlutsData(fields[2]);
   if (typeof bidderAddr !== "string") return undefined;
   
-  const salt = (fields[3] as DataB).toString();
+  if(!(fields[3] instanceof DataB)) return undefined;
+  const salt = fields[3].bytes.toString();
 
-  const title = decodeHex((fields[4] as DataB).bytes.toString());
-  const description = decodeHex((fields[5] as DataB).bytes.toString());
+  if(!(fields[4] instanceof DataB)) return undefined;
+  const title = decodeHex(fields[4].bytes.toString());
+  
+  if(!(fields[5] instanceof DataB)) return undefined;
+  const description = decodeHex(fields[5].bytes.toString());
 
   return {
     proposalRef,
@@ -160,6 +167,27 @@ export function decodeBidDatum(datum: any) {
     salt,
     title,
     description,
+  };
+}
+
+export function decodeUnkownBidDatum(datum: any) {
+  if (!canBeData(datum)) return undefined;
+
+  const data = forceData(datum);
+
+  if (!(data instanceof DataConstr)) {
+    return undefined;
+  }
+
+  const fields = data.fields;
+
+  const proposalRef = utxoRefFromData( fields[0] );
+  if(!(fields[1] instanceof DataB)) return undefined;
+  const hash = decodeHex((fields[1]).bytes.toString());
+
+  return {
+    proposalRef,
+    hash
   };
 }
 
