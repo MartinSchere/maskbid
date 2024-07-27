@@ -60,7 +60,7 @@ export default function Home() {
           return [];
         }
 
-        return [decodeProposalDatum(d.datum.json)];
+        return [decodeProposalDatum(d.datum.bytes)];
       });
     },
   });

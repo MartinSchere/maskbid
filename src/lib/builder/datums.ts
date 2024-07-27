@@ -1,4 +1,4 @@
-import { Address, dataToCbor } from "@harmoniclabs/plu-ts";
+import { Address, canBeData, DataB, DataConstr, dataFromCbor, DataI, dataToCbor, dataToCborObj, forceData, Hash28, isData, PaymentCredentials, Data as PlutsData, StakeCredentials, StakeKeyHash } from "@harmoniclabs/plu-ts";
 import {
   Constr,
   Data,
@@ -74,15 +74,28 @@ export function decodeProposalDatum(datum: any) {
   //     ]
   //   }
 
-  const { fields } = datum;
+  if(!canBeData( datum )) return undefined;
 
-  const revealTime = new Date(fields[0].int);
-  const decisionTime = new Date(fields[1].int);
+  const data = forceData( datum );
+
+  console.log( data.toJson() );
+  
+  if(!( data instanceof DataConstr ))
+  {
+    return undefined;
+  }
+
+  const fields = data.fields;
+
+  const revealTime = new Date(Number((fields[0] as DataI).int));
+  const decisionTime = new Date(Number((fields[1] as DataI).int));
   console.log(Data.to(Data.fromJson(fields[2])));
-  const requesterAddr = Address.fromCbor(Data.to(Data.fromJson(fields[2])));
+  const requesterAddr = addressFromPlutsData( fields[2] );
 
-  const title = Buffer.from(fields[3].bytes, "hex").toString();
-  const description = Buffer.from(fields[4].bytes, "hex").toString();
+  if( typeof requesterAddr !== "string" ) return  undefined;
+
+  const title = (fields[3] as DataB).bytes.toString();
+  const description = (fields[4] as DataB).bytes.toString();
 
   return {
     revealTime,
@@ -91,6 +104,45 @@ export function decodeProposalDatum(datum: any) {
     title,
     description,
   };
+}
+
+export function addressFromPlutsData( data: PlutsData )
+{
+  if(!( data instanceof DataConstr )) return undefined;
+  const [ pay, stake ] = data.fields;
+  if(!( pay instanceof DataConstr && stake instanceof DataConstr )) return undefined;
+  const [ payHash ] = pay.fields;
+  if(!( payHash instanceof DataB )) return undefined;
+
+  const payCreds = new PaymentCredentials(
+    Number(pay.constr) === 0 ? "pubKey" : "script",
+    new Hash28( payHash.bytes.toBuffer() )
+  );
+
+  let stakeCreds: StakeCredentials | undefined = undefined;
+  const [ stakeConstr ] = stake.fields;
+  if( stakeConstr instanceof DataConstr )
+  {
+    const [ stakeCredsData ] = stakeConstr.fields;
+    if( stakeCredsData instanceof DataConstr )
+    {
+      const [ stakeHash ] = stakeCredsData.fields;
+      if( stakeHash instanceof DataB )
+      {
+        stakeCreds = new StakeCredentials(
+          Number( stakeCredsData.constr ) === 0 ? "stakeKey" : "script",
+          new Hash28( stakeHash.bytes.toBuffer() )
+        );
+      }
+    }
+  }
+
+  const addr = Address.testnet(
+    payCreds,
+    stakeCreds
+  );
+
+  return  addr.toString();
 }
 
 export async function createProposal(
