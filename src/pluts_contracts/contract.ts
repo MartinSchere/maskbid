@@ -1,4 +1,4 @@
-import { Address, compile, data, int, passert, pBool, pBSToData, PaymentCredentials, perror, pfn, pisEmpty, plet, pmatch, PScriptContext, pserialiseData, psha2_256, PTxOut, punBData, punIData, punsafeConvertType, Script, ScriptType, unit } from "@harmoniclabs/plu-ts";
+import { Address, compile, data, int, passert, pBool, pBSToData, PaymentCredentials, perror, pfn, pisEmpty, plet, pmatch, PScriptContext, pserialiseData, psha2_256, PTxOut, punBData, punIData, punsafeConvertType, Script, ScriptType, unit, ptrace, bs, pshowBs, pStr, ptraceIfFalse, bool, pdelay } from "@harmoniclabs/plu-ts";
 import { BID_CTOR_IDX, MockBid, MockProposal, PrivateTenderDatum } from "./PrivateTenderDatum";
 import { BidAction } from "./BidAction";
 import { plovelaces } from "./plovelaces";
@@ -109,30 +109,56 @@ const privateTender = pfn([
             );
 
             // inlined
-            const canReveal = revealTime.ltEq(
-                pmatch( tx.interval.from.bound )
-                .onPFinite(({ _0 }) => _0)
-                ._( _ => perror( int ) )
+            const canReveal = ptraceIfFalse.$(pdelay(pStr("too early")))
+            .$(
+                revealTime.ltEq(
+                    pmatch( tx.interval.from.bound )
+                    .onPFinite(({ _0 }) => _0)
+                    ._( _ => perror( int ) )
+                )
             );
 
             const revealedBidOut = plet( tx.outputs.head );
 
             // inlined
-            const staysInContract = (
+            const staysInContract = ptraceIfFalse.$(pdelay(pStr("wrong addr")))
+            .$(
                 revealedBidOut.address.eq( ownAddr )
             );
 
-            // inlined
-            const correctDatum = (
-                bidHash.eq(
-                    psha2_256.$(
-                        pserialiseData.$(
-                            revealedBidOut
-                            // inline datum (or fail calling serialiseData)
-                            .datum.raw.fields.head
-                        )
+            const tracedBidHash = ptrace( bs )
+            .$(
+                pStr("expected hash: ")
+                .concat(
+                    pshowBs.$( bidHash ).utf8Decoded
+                )
+            )
+            .$(
+                bidHash
+            );
+
+            const tracedRealHash = plet(
+                psha2_256.$(
+                    pserialiseData.$(
+                        revealedBidOut
+                        // inline datum (or fail calling serialiseData)
+                        .datum.raw.fields.head
                     )
                 )
+            ).in( realHash =>
+                ptrace( bs )
+                .$(
+                    pStr("real hash: ")
+                    .concat(
+                        pshowBs.$( realHash ).utf8Decoded
+                    )
+                )
+                .$( realHash )
+            )
+
+            // inlined
+            const correctDatum = (
+                tracedBidHash.eq( tracedRealHash )
             );
 
             return canReveal
