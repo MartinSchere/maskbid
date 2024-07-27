@@ -1,7 +1,8 @@
-import { Address, compile, data, int, passert, pBool, pBSToData, PaymentCredentials, perror, pfn, pisEmpty, plet, pmatch, PScriptContext, pserialiseData, psha2_256, PTxOut, punBData, punIData, punsafeConvertType, Script, ScriptType, unit, ptrace, bs, pshowBs, pStr, ptraceIfFalse, bool, pdelay } from "@harmoniclabs/plu-ts";
-import { BID_CTOR_IDX, MockBid, MockProposal, PrivateTenderDatum } from "./PrivateTenderDatum";
+import { Address, compile, data, int, passert, pBool, pBSToData, PaymentCredentials, perror, pfn, pisEmpty, plet, pmatch, PScriptContext, pserialiseData, psha2_256, PTxOut, punBData, punIData, punsafeConvertType, Script, ScriptType, unit, ptrace, bs, pshowBs, pStr, ptraceIfFalse, bool, pdelay, PTxOutRef } from "@harmoniclabs/plu-ts";
+import { BID_CTOR_IDX, MockBid, MockProposal, MockUnknownBid, PrivateTenderDatum } from "./PrivateTenderDatum";
 import { BidAction } from "./BidAction";
 import { plovelaces } from "./plovelaces";
+import { M } from "lucid-cardano";
 
 const privateTender = pfn([
     PrivateTenderDatum.type,
@@ -90,7 +91,25 @@ const privateTender = pfn([
             .strictAnd( requesterSigned )
             .strictAnd( bidderReceived );
         })
-        .onUnknownBid(({ bidHash, proposalRef }) => {
+        .onUnknownBid(({}) => {
+
+            const unknownBid = punsafeConvertType(
+                datum,
+                MockUnknownBid.type
+            );
+
+            const bidHash = plet(
+                punBData.$(
+                    unknownBid.raw.fields.tail.head
+                )
+            );
+
+            const proposalRef = plet(
+                punsafeConvertType(
+                    unknownBid.raw.fields.head,
+                    PTxOutRef.type
+                )
+            );
             
             const proposalRefIn = plet(
                 plet( proposalRef.peq ).in( isProposalRef => 
@@ -162,8 +181,8 @@ const privateTender = pfn([
             );
 
             return canReveal
-            .strictAnd( staysInContract )
-            .strictAnd( correctDatum );
+            .and( staysInContract )
+            .and( correctDatum );
 
         })
         .onBid(({ bidderAddr, proposalRef }) =>

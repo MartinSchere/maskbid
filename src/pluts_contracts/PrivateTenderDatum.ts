@@ -52,7 +52,14 @@ export const MockBid = pstruct({
     proposedAmount: int,
     bidderAddr: PAddress.type,
     salt: bs, // anti brute force
-  },
+  }
 });
 
 export const BID_CTOR_IDX = pInt(2);
+
+export const MockUnknownBid = pstruct({
+  UnknownBid: {
+    proposalRef: PTxOutRef.type,
+    bidHash: bs,
+  },
+});
