@@ -7,7 +7,10 @@ export const PrivateTenderDatum = pstruct({
         // lower time when decision can be taken
         decisionTime: int,
         // address of who is requesting the project
-        reqesterAddr: PAddress.type
+        reqesterAddr: PAddress.type,
+        // additional fields for offchain
+        title: bs,
+        description: bs
     },
     UnknownBid: {
         proposalRef: PTxOutRef.type,
