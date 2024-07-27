@@ -1,8 +1,8 @@
 import { Lucid, MaestroSupportedNetworks } from "lucid-cardano";
-import { maestro } from "./maestro";
+import { maestroProvider } from "./maestro";
 
 export const getLucid = async () =>
   Lucid.new(
-    maestro,
+    maestroProvider,
     (process.env.NEXT_PUBLIC_NETWORK as MaestroSupportedNetworks) ?? "Mainnet"
   );

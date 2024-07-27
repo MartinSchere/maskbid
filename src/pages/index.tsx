@@ -1,6 +1,9 @@
+import { decodeProposalDatum } from "@/lib/builder/datums";
 import { getLucid } from "@/lib/lucid";
-import { maestro } from "@/lib/maestro";
+import { maestroClient, maestroProvider } from "@/lib/maestro";
 import { formatLovelace } from "@/lib/utils";
+import { contractAddr } from "@/pluts_contracts/contract";
+import { useQuery } from "@tanstack/react-query";
 import { Lucid, MaestroSupportedNetworks, UTxO } from "lucid-cardano";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -41,22 +44,33 @@ function ProposalCard({
 
 export default function Home() {
   const { address } = useCardanoWallet();
-  // const [utxos, setUtxos] = useState<undefined | UTxO[]>();
 
-  // useEffect(() => {
-  //   async function run() {
-  //     if (!address) return;
-  //     const lucid = await getLucid();
-  //     const utxos = await lucid.utxosAt(address);
+  const { data, error } = useQuery({
+    queryKey: ["proposals"],
+    queryFn: async () => {
+      const { data } = await maestroClient.addresses.utxosByAddress(
+        contractAddr,
+        {
+          resolve_datums: true,
+        }
+      );
 
-  //     setUtxos(utxos);
-  //   }
-  //   run();
-  // }, [address]);
+      return data.flatMap((d) => {
+        if (!d.datum) {
+          return [];
+        }
+
+        return [decodeProposalDatum(d.datum.json)];
+      });
+    },
+  });
 
   return (
     <div>
       <h1 className="font-bold text-2xl mb-8">Search RFPs</h1>
+
+      <pre>{JSON.stringify(data ?? {}, null, 2)}</pre>
+      <pre>{error?.message}</pre>
 
       <ul className="flex gap-2 flex-col">
         {list.map((item, index) => (

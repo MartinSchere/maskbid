@@ -4,6 +4,7 @@ import { Header } from "@/components/header";
 import { Space_Mono } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/toaster";
 
 const spaceMono = Space_Mono({ subsets: ["latin"], weight: ["400", "700"] });
 
@@ -24,6 +25,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
         font-family: ${spaceMono.style.fontFamily};
       `}</style>
       </main>
+      <Toaster />
     </QueryClientProvider>
   );
 }

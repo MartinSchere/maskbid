@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { DateTimePicker } from "@/components/ui/datetime-picker";
 import {
   Form,
   FormControl,
@@ -10,32 +11,73 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
+import { createProposal } from "@/lib/builder/datums";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
+import useCardanoWallet from "use-cardano-wallet";
 import { z } from "zod";
 
 const formSchema = z.object({
   title: z.string(),
   description: z.string(),
-  amount: z.number(),
-  expiry: z.date(),
+  amount: z.coerce.number(),
+  deadline: z.date().min(new Date(), "Deadline must be in the future"),
 });
 
 export default function CreateRfpPage() {
+  const { api, address } = useCardanoWallet();
+  const { toast } = useToast();
+
+  const { mutate: onSubmit, isPending } = useMutation({
+    mutationFn: async (values: z.infer<typeof formSchema>) => {
+      if (!address || !api) {
+        form.setError("root", {
+          message: "You need to connect your wallet to create an RFP",
+        });
+        return;
+      }
+
+      const { title, description, amount, deadline } = values;
+
+      await createProposal(
+        address,
+        title,
+        description,
+        deadline,
+        BigInt(amount),
+        api
+      );
+    },
+    onError: (error) => {
+      console.error(error);
+      form.setError("root", {
+        message: "An error occurred while creating the RFP",
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "RFP successfully created",
+        description:
+          "Your RFP has been successfully created and is now accepting bids",
+      });
+    },
+  });
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log(values);
-  }
-
   return (
-    <div className="w-[800px] mt-28">
+    <div className="w-[800px] mt-24">
       <h1 className="text-2xl mb-8 font-bold">Create your RFP</h1>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 ">
+        <form
+          onSubmit={form.handleSubmit((v) => onSubmit(v))}
+          className="space-y-8 "
+        >
           <FormField
             control={form.control}
             name="title"
@@ -90,7 +132,36 @@ export default function CreateRfpPage() {
               </FormItem>
             )}
           />
-          <Button type="submit">Create RFP</Button>
+          <FormField
+            control={form.control}
+            name="deadline"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="block mb-2">Deadline</FormLabel>
+                <FormControl>
+                  <DateTimePicker
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                </FormControl>
+
+                <FormDescription>
+                  This is the deadline for the RFP. Proposals submitted after
+                  this date will be rejected.
+                </FormDescription>
+
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          {form.formState.errors.root && (
+            <p className="text-destructive">
+              {form.formState.errors.root.message}
+            </p>
+          )}
+          <Button type="submit" isLoading={isPending}>
+            Create RFP
+          </Button>
         </form>
       </Form>
     </div>
