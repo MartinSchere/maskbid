@@ -1,20 +1,9 @@
-import {
-  contractAddr,
-  contractBytes,
-  contractCbor,
-  contractScript,
-} from "@/pluts_contracts/contract";
-import {
-  WalletApi as LucidWalletApi,
-  Data,
-  toHex,
-  UTxO,
-  applyDoubleCborEncoding,
-} from "lucid-cardano";
+import { contractAddr, contractBytes, contractScript } from "@/pluts_contracts/contract";
+import { WalletApi as LucidWalletApi, Data, toHex, UTxO, applyDoubleCborEncoding, unixTimeToEnclosingSlot, SLOT_CONFIG_NETWORK } from "lucid-cardano";
 import { getLucid } from "../lucid";
 import { WalletApi } from "use-cardano-wallet";
 import { createProposalDatum, createUnknownBidDatum } from "./datums";
-import { hashData } from "@harmoniclabs/plu-ts";
+import { Address, DataI, defaultProtocolParameters, forceData, hoistedToStr, UTxO as PlutsUTxO, TxBuilder, unit, Value } from "@harmoniclabs/plu-ts";
 import { UtxoWithSlot } from "@maestro-org/typescript-sdk";
 import { utxoWithSlotToUtxo } from "../utils";
 
@@ -112,6 +101,49 @@ export async function createRevealedBid(
   if (typeof bidData !== "string")
     throw new Error("unknown bid for hash: " + bidHash);
 
+
+  const txBuilder = new TxBuilder( defaultProtocolParameters );
+
+  let _tx = txBuilder.buildSync({
+    inputs: [
+      {
+        utxo: luxidToPlutsUtxo( hiddenBidUtxo ),
+        inputScript: {
+          datum: "inline",
+          redeemer: new DataI( 0 ),
+          script: contractScript
+        }
+      }
+    ],
+    collaterals: [
+      luxidToPlutsUtxo(
+        (await lucid.wallet.getUtxos())
+        .filter(
+          u => {
+            const units = Object.keys( u.assets );
+            if( units.length !== 1 ) return false;
+            if( units[0] !== "lovelace" ) return false;
+            if( (u.assets as any).lovelace >= 2_000_000 ) return false;
+  
+            return true
+          }
+        )[0]
+      )
+    ],
+    readonlyRefInputs: [
+      luxidToPlutsUtxo( resolvedProposalRef )
+    ],
+    invalidBefore: unixTimeToEnclosingSlot(Date.now(), SLOT_CONFIG_NETWORK.Preprod ),
+    outputs: [
+      {
+        address: Address.fromString( contractAddr ),
+        value: Value.lovelaces( 2_000_000 ),
+        datum: forceData( bidData ) 
+      }
+    ]
+  })
+
+
   const tx = await lucid
     .newTx()
     .attachSpendingValidator({
@@ -137,4 +169,19 @@ export async function createRevealedBid(
     .then((txComplete) => txComplete.sign().complete());
 
   return tx.submit();
+}
+
+export function luxidToPlutsUtxo( hiddenBidUtxo: any ): PlutsUTxO
+{
+  return new PlutsUTxO({
+    utxoRef: {
+      id: hiddenBidUtxo.tx_hash,
+      index: hiddenBidUtxo.index
+    },
+    resolved: {
+      address: Address.fromString( hiddenBidUtxo.address ),
+      value: Value.fromUnits( hiddenBidUtxo.assets as any ),
+      datum: forceData( hiddenBidUtxo.datum?.bytes! )
+    }
+  })
 }
