@@ -1,7 +1,10 @@
-import { decodeProposalDatum } from "@/lib/builder/datums";
+import {
+  decodeProposalDatum,
+  proposalUtxoToProposal,
+} from "@/lib/builder/datums";
 import { getLucid } from "@/lib/lucid";
 import { maestroClient, maestroProvider } from "@/lib/maestro";
-import { formatLovelace } from "@/lib/utils";
+import { formatLovelace, slotToDate } from "@/lib/utils";
 import { contractAddr } from "@/pluts_contracts/contract";
 import { useQuery } from "@tanstack/react-query";
 import { Lucid, MaestroSupportedNetworks, UTxO } from "lucid-cardano";
@@ -16,7 +19,7 @@ interface Proposal {
   createdAt: Date;
   expiry: Date;
   creator: string;
-  id: number;
+  id: string;
 }
 
 function ProposalCard({
@@ -55,13 +58,7 @@ export default function Home() {
         }
       );
 
-      return data.flatMap((d) => {
-        if (!d.datum) {
-          return [];
-        }
-
-        return [decodeProposalDatum(d.datum.bytes)];
-      });
+      return data.flatMap((d) => proposalUtxoToProposal(d) ?? []);
     },
   });
 
@@ -69,11 +66,10 @@ export default function Home() {
     <div>
       <h1 className="font-bold text-2xl mb-8">Search RFPs</h1>
 
-      <pre>{JSON.stringify(data ?? {}, null, 2)}</pre>
       <pre>{error?.message}</pre>
 
       <ul className="flex gap-2 flex-col">
-        {list.map((item, index) => (
+        {data?.map((item, index) => (
           <ProposalCard key={index} {...item} />
         ))}
       </ul>

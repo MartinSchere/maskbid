@@ -13,3 +13,10 @@ export function formatLovelace(value: number) {
   });
   return formatter.format(`${value / 1000000}`).replace("$", "");
 }
+
+export function decodeHex(hexString: string) {
+  return Buffer.from(hexString, "hex").toString("utf-8");
+}
+export function slotToDate(slotNo: number) {
+  return new Date((1596491091 + (slotNo - 4924800)) * 1000);
+}

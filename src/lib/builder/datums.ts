@@ -1,15 +1,94 @@
-import { Address, canBeData, DataB, DataConstr, dataFromCbor, DataI, dataToCbor, dataToCborObj, forceData, Hash28, isData, PaymentCredentials, Data as PlutsData, StakeCredentials, StakeKeyHash } from "@harmoniclabs/plu-ts";
+import {
+  Address,
+  canBeData,
+  DataB,
+  DataConstr,
+  dataFromCbor,
+  DataI,
+  dataToCbor,
+  dataToCborObj,
+  forceData,
+  Hash28,
+  isData,
+  PaymentCredentials,
+  Data as PlutsData,
+  StakeCredentials,
+  StakeKeyHash,
+} from "@harmoniclabs/plu-ts";
+import { sha2_256 } from "@harmoniclabs/crypto";
 import {
   Constr,
   Data,
   Wallet,
   WalletApi as LucidWalletApi,
+  fromHex,
+  toHex,
 } from "lucid-cardano";
 import { getLucid } from "../lucid";
 import { contractAddr } from "@/pluts_contracts/contract";
 import { WalletApi } from "use-cardano-wallet";
+import { decodeHex, slotToDate } from "../utils";
+import { UtxoWithSlot } from "@maestro-org/typescript-sdk";
 
-function createProposalDatum(
+function createBid(
+  proposalUtxoRef: string,
+  bidAmount: bigint,
+  bidderAddress: string,
+  title: string,
+  description: string
+) {
+  const salt = Math.floor(Math.random() * 1000000)
+    .toString(16)
+    .padStart(6, "0");
+
+  return new Constr(2, [
+    utxoRefToData(proposalUtxoRef),
+    bidAmount,
+    addressToPlutsData(bidderAddress),
+    salt,
+  ]);
+}
+
+export function createUnknownBidDatum(
+  proposalUtxoRef: string,
+  bidAmount: bigint,
+  bidderAddress: string,
+  title: string,
+  description: string
+) {
+  const bid = createBid(
+    proposalUtxoRef,
+    bidAmount,
+    bidderAddress,
+    title,
+    description
+  );
+  const hash = hashDatum(bid);
+
+  return {
+    data: new Constr(1, [utxoRefToData(proposalUtxoRef), hash]),
+    bid,
+    hash,
+  };
+}
+
+export function hashDatum(datum: Data) {
+  console.log("DATUM", datum);
+  const cbor = Data.to(datum);
+  console.log("CBOR", cbor);
+  return toHex(sha2_256(fromHex(cbor)));
+}
+
+function utxoRefToData(utxoRef: string) {
+  const [txHash, txIndex] = utxoRef.split(".");
+  return new Constr(0, [new Constr(0, [txHash]), BigInt(txIndex)]);
+}
+
+function addressToPlutsData(address: string) {
+  return Data.from(dataToCbor(Address.fromString(address).toData()).toString());
+}
+
+export function createProposalDatum(
   title: string,
   description: string,
   ownerAddress: string,
@@ -18,70 +97,18 @@ function createProposalDatum(
   return new Constr(0, [
     BigInt(deadline.valueOf()),
     BigInt(deadline.valueOf() + 1000 * 60),
-    Data.from(dataToCbor(Address.fromString(ownerAddress).toData()).toString()),
+    addressToPlutsData(ownerAddress),
     Buffer.from(title).toString("hex"),
     Buffer.from(description).toString("hex"),
   ]);
 }
 
 export function decodeProposalDatum(datum: any) {
-  // {
-  //     "constructor": 0,
-  //     "fields": [
-  //       {
-  //         "int": 1722290400000
-  //       },
-  //       {
-  //         "int": 1722290460000
-  //       },
-  //       {
-  //         "constructor": 0,
-  //         "fields": [
-  //           {
-  //             "constructor": 0,
-  //             "fields": [
-  //               {
-  //                 "bytes": "b759a7b9ff05d5f9ed4e5154136c382ac83609b0c85732c86eb46d47"
-  //               }
-  //             ]
-  //           },
-  //           {
-  //             "constructor": 0,
-  //             "fields": [
-  //               {
-  //                 "constructor": 0,
-  //                 "fields": [
-  //                   {
-  //                     "constructor": 0,
-  //                     "fields": [
-  //                       {
-  //                         "bytes": "97b3ea1ed8e2a714b7f4fbd4f997f0f7d3f42126398694d6d080c1ae"
-  //                       }
-  //                     ]
-  //                   }
-  //                 ]
-  //               }
-  //             ]
-  //           }
-  //         ]
-  //       },
-  //       {
-  //         "bytes": "46697273742070726f706f73616c"
-  //       },
-  //       {
-  //         "bytes": "48656c6c6f"
-  //       }
-  //     ]
-  //   }
+  if (!canBeData(datum)) return undefined;
 
-  if(!canBeData( datum )) return undefined;
+  const data = forceData(datum);
 
-  const data = forceData( datum );
-
-  console.log( data.toJson() );
-  
-  if(!( data instanceof DataConstr ))
-  {
+  if (!(data instanceof DataConstr)) {
     return undefined;
   }
 
@@ -89,13 +116,12 @@ export function decodeProposalDatum(datum: any) {
 
   const revealTime = new Date(Number((fields[0] as DataI).int));
   const decisionTime = new Date(Number((fields[1] as DataI).int));
-  console.log(Data.to(Data.fromJson(fields[2])));
-  const requesterAddr = addressFromPlutsData( fields[2] );
+  const requesterAddr = addressFromPlutsData(fields[2]);
 
-  if( typeof requesterAddr !== "string" ) return  undefined;
+  if (typeof requesterAddr !== "string") return undefined;
 
-  const title = (fields[3] as DataB).bytes.toString();
-  const description = (fields[4] as DataB).bytes.toString();
+  const title = decodeHex((fields[3] as DataB).bytes.toString());
+  const description = decodeHex((fields[4] as DataB).bytes.toString());
 
   return {
     revealTime,
@@ -106,72 +132,76 @@ export function decodeProposalDatum(datum: any) {
   };
 }
 
-export function addressFromPlutsData( data: PlutsData )
-{
-  if(!( data instanceof DataConstr )) return undefined;
-  const [ pay, stake ] = data.fields;
-  if(!( pay instanceof DataConstr && stake instanceof DataConstr )) return undefined;
-  const [ payHash ] = pay.fields;
-  if(!( payHash instanceof DataB )) return undefined;
+export function addressFromPlutsData(data: PlutsData) {
+  if (!(data instanceof DataConstr)) return undefined;
+  const [pay, stake] = data.fields;
+  if (!(pay instanceof DataConstr && stake instanceof DataConstr))
+    return undefined;
+  const [payHash] = pay.fields;
+  if (!(payHash instanceof DataB)) return undefined;
 
   const payCreds = new PaymentCredentials(
     Number(pay.constr) === 0 ? "pubKey" : "script",
-    new Hash28( payHash.bytes.toBuffer() )
+    new Hash28(payHash.bytes.toBuffer())
   );
 
   let stakeCreds: StakeCredentials | undefined = undefined;
-  const [ stakeConstr ] = stake.fields;
-  if( stakeConstr instanceof DataConstr )
-  {
-    const [ stakeCredsData ] = stakeConstr.fields;
-    if( stakeCredsData instanceof DataConstr )
-    {
-      const [ stakeHash ] = stakeCredsData.fields;
-      if( stakeHash instanceof DataB )
-      {
+  const [stakeConstr] = stake.fields;
+  if (stakeConstr instanceof DataConstr) {
+    const [stakeCredsData] = stakeConstr.fields;
+    if (stakeCredsData instanceof DataConstr) {
+      const [stakeHash] = stakeCredsData.fields;
+      if (stakeHash instanceof DataB) {
         stakeCreds = new StakeCredentials(
-          Number( stakeCredsData.constr ) === 0 ? "stakeKey" : "script",
-          new Hash28( stakeHash.bytes.toBuffer() )
+          Number(stakeCredsData.constr) === 0 ? "stakeKey" : "script",
+          new Hash28(stakeHash.bytes.toBuffer())
         );
       }
     }
   }
 
-  const addr = Address.testnet(
-    payCreds,
-    stakeCreds
-  );
+  const addr = Address.testnet(payCreds, stakeCreds);
 
-  return  addr.toString();
+  return addr.toString();
 }
 
-export async function createProposal(
-  creatorAddress: string,
-  title: string,
-  description: string,
-  deadline: Date,
-  amount: bigint,
-  walletApi: Omit<WalletApi, "experimental">
-) {
-  const lucid = await getLucid();
+export type Proposal = {
+  title: string;
+  description: string;
+  deadline: Date;
+  amount: number;
+  id: string;
+  createdAt: Date;
+  expiry: Date;
+  creator: `addr1${string}` | `addr_test1${string}`;
+};
 
-  lucid.selectWallet(walletApi as unknown as LucidWalletApi);
+export function proposalUtxoToProposal(
+  utxo: UtxoWithSlot
+): Proposal | undefined {
+  if (!utxo.datum) {
+    return undefined;
+  }
 
-  const tx = await lucid
-    .newTx()
-    .payToContract(
-      contractAddr,
-      {
-        inline: Data.to(
-          createProposalDatum(title, description, creatorAddress, deadline)
-        ),
-      },
-      {
-        lovelace: amount * BigInt(1_000_000),
-      }
-    )
-    .complete()
-    .then((txComplete) => txComplete.sign().complete());
+  const decoded = decodeProposalDatum(utxo.datum.bytes);
 
-  return tx.submit();
+  if (!decoded) {
+    return undefined;
+  }
+
+  const { title, description, decisionTime, requesterAddr, revealTime } =
+    decoded;
+
+  const ada = utxo.assets.find((a) => a.unit === "lovelace")!;
+
+  return {
+    title,
+    description,
+    deadline: revealTime,
+    amount: parseInt(ada.amount, 10),
+    id: `${utxo.tx_hash}.${utxo.index.toString()}`,
+    createdAt: slotToDate(utxo.slot),
+    expiry: revealTime,
+    creator: requesterAddr,
+  };
 }
