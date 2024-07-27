@@ -1,8 +1,7 @@
-import { Address, compile, data, int, passert, pBool, pBSToData, PaymentCredentials, perror, pfn, pisEmpty, plet, pmatch, PScriptContext, pserialiseData, psha2_256, PTxOut, punBData, punIData, punsafeConvertType, Script, ScriptType, unit, ptrace, bs, pshowBs, pStr, ptraceIfFalse, bool, pdelay, PTxOutRef } from "@harmoniclabs/plu-ts";
-import { BID_CTOR_IDX, MockBid, MockProposal, MockUnknownBid, PrivateTenderDatum } from "./PrivateTenderDatum";
+import { Address, compile, data, int, passert, pBool, pBSToData, PaymentCredentials, perror, pfn, pisEmpty, plet, pmatch, PScriptContext, pserialiseData, psha2_256, PTxOut, punBData, punIData, punsafeConvertType, Script, ScriptType, unit, ptrace, bs, pshowBs, pStr, ptraceIfFalse, bool, pdelay } from "@harmoniclabs/plu-ts";
+import { BID_CTOR_IDX, MockBid, MockProposal, PrivateTenderDatum } from "./PrivateTenderDatum";
 import { BidAction } from "./BidAction";
 import { plovelaces } from "./plovelaces";
-import { M } from "lucid-cardano";
 
 const privateTender = pfn([
     PrivateTenderDatum.type,
@@ -24,8 +23,9 @@ const privateTender = pfn([
     const ownAddr = plet( ownInput.address );
     const ownValue = plet( ownInput.value );
 
-    return passert.$(
-        pmatch( datum )
+    return ptrace( unit ).$("hello").$(passert.$(
+        ptrace( bool ).$("there")
+        .$(pmatch( datum )
         .onProposal(({ decisionTime, reqesterAddr }) => {
 
             // inlined
@@ -91,25 +91,7 @@ const privateTender = pfn([
             .strictAnd( requesterSigned )
             .strictAnd( bidderReceived );
         })
-        .onUnknownBid(({}) => {
-
-            const unknownBid = punsafeConvertType(
-                datum,
-                MockUnknownBid.type
-            );
-
-            const bidHash = plet(
-                punBData.$(
-                    unknownBid.raw.fields.tail.head
-                )
-            );
-
-            const proposalRef = plet(
-                punsafeConvertType(
-                    unknownBid.raw.fields.head,
-                    PTxOutRef.type
-                )
-            );
+        .onUnknownBid(({ bidHash, proposalRef }) => {
             
             const proposalRefIn = plet(
                 plet( proposalRef.peq ).in( isProposalRef => 
@@ -180,9 +162,9 @@ const privateTender = pfn([
                 tracedBidHash.eq( tracedRealHash )
             );
 
-            return canReveal
-            .and( staysInContract )
-            .and( correctDatum );
+            return ptrace( bool ).$("1").$( canReveal )
+            .and(  ptrace( bool ).$("2").$( staysInContract ) )
+            .and(  ptrace( bool ).$("3").$( correctDatum ) );
 
         })
         .onBid(({ bidderAddr, proposalRef }) =>
@@ -203,8 +185,8 @@ const privateTender = pfn([
             )
             // forward validation to Proposal spending
             .onSelectBid( _ => tx.inputs.some( input => input.utxoRef.eq( proposalRef ) ))
-        )
-    );
+        ))
+    ));
 });
 
 export const contractBytes = compile( privateTender, [1,0,0] );
