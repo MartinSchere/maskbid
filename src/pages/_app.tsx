@@ -17,7 +17,7 @@ const queryClient = new QueryClient();
 export default function MyApp({ Component, pageProps }: AppProps) {
   return (
     <QueryClientProvider client={queryClient}>
-      <main className={cn(spaceMono.className, "mx-32")}>
+      <main className={cn(spaceMono.className, "mx-64")}>
         <Header /> <Component {...pageProps} />
         <style jsx global>{`
       body {
