@@ -141,25 +141,25 @@ export function decodeBidDatum(datum: any) {
     return undefined;
   }
 
-  if( Number( data.constr ) !== 2 ) return undefined;
+  if (Number(data.constr) !== 2) return undefined;
 
   const fields = data.fields;
 
-  const proposalRef = utxoRefFromData( fields[0] );
-  
-  if(!(fields[1] instanceof DataI)) return undefined;
+  const proposalRef = utxoRefFromData(fields[0]);
+
+  if (!(fields[1] instanceof DataI)) return undefined;
   const proposedAmount = Number(fields[1].int);
 
   const bidderAddr = addressFromPlutsData(fields[2]);
   if (typeof bidderAddr !== "string") return undefined;
-  
-  if(!(fields[3] instanceof DataB)) return undefined;
+
+  if (!(fields[3] instanceof DataB)) return undefined;
   const salt = fields[3].bytes.toString();
 
-  if(!(fields[4] instanceof DataB)) return undefined;
+  if (!(fields[4] instanceof DataB)) return undefined;
   const title = decodeHex(fields[4].bytes.toString());
-  
-  if(!(fields[5] instanceof DataB)) return undefined;
+
+  if (!(fields[5] instanceof DataB)) return undefined;
   const description = decodeHex(fields[5].bytes.toString());
 
   return {
@@ -181,38 +181,36 @@ export function decodeUnkownBidDatum(datum: any) {
     return undefined;
   }
 
-  if( Number( data.constr ) !== 1 ) return undefined;
+  if (Number(data.constr) !== 1) return undefined;
 
   const fields = data.fields;
 
-  const proposalRef = utxoRefFromData( fields[0] );
+  const proposalRef = utxoRefFromData(fields[0]);
 
-  if(!(fields[1] instanceof DataB)) return undefined;
-  const hash = decodeHex((fields[1]).bytes.toString());
+  if (!(fields[1] instanceof DataB)) return undefined;
+
+  const hash = fields[1].bytes.toString();
 
   return {
     proposalRef,
-    hash
+    hash,
   };
 }
 
-export function utxoRefFromData( data: PlutsData )
-{
-  if(!( data instanceof DataConstr )) return undefined;
-  
-  const [ idConstr, idx ] = data.fields;
-  if(!(idConstr instanceof DataConstr)) return undefined;
+export function utxoRefFromData(data: PlutsData) {
+  console.log(data);
+  if (!(data instanceof DataConstr)) return undefined;
 
-  const [ wrappedId ] = idConstr.fields;
-  if(!( wrappedId instanceof DataConstr )) return undefined;
+  const [idConstr, idx] = data.fields;
+  if (!(idConstr instanceof DataConstr)) return undefined;
 
-  const [ idData ] = wrappedId.fields;
-  if(!(idData instanceof DataB)) return undefined;
-  if(!(idx instanceof DataI)) return undefined;
+  const [idData] = idConstr.fields;
+  if (!(idData instanceof DataB)) return undefined;
+  if (!(idx instanceof DataI)) return undefined;
 
   return {
     id: idData.bytes.toString(),
-    idx: Number( idx.int )
+    idx: Number(idx.int),
   };
 }
 
@@ -287,5 +285,72 @@ export function proposalUtxoToProposal(
     createdAt: slotToDate(utxo.slot),
     expiry: revealTime,
     creator: requesterAddr,
+  };
+}
+
+export interface Bid {
+  proposalRef: string;
+  proposedAmount: number;
+  bidderAddr: string;
+  salt: string;
+  title: string;
+  description: string;
+}
+
+export function bidUtxoToBid(utxo: UtxoWithSlot): Bid | undefined {
+  if (!utxo.datum) {
+    return undefined;
+  }
+
+  const decoded = decodeBidDatum(utxo.datum.bytes);
+
+  if (!decoded) {
+    return undefined;
+  }
+
+  const { proposalRef, proposedAmount, bidderAddr, salt, title, description } =
+    decoded;
+
+  if (!proposalRef) {
+    return undefined;
+  }
+
+  return {
+    proposalRef: `${proposalRef.id}.${proposalRef.idx}`,
+    proposedAmount,
+    bidderAddr,
+    salt,
+    title,
+    description,
+  };
+}
+
+export interface HiddenBid {
+  proposalRef: string;
+  hash: string;
+}
+
+export function hiddenBidUtxoToHiddenBid(
+  utxo: UtxoWithSlot
+): HiddenBid | undefined {
+  if (!utxo.datum) {
+    return undefined;
+  }
+
+  const decoded = decodeUnkownBidDatum(utxo.datum.bytes);
+
+  if (!decoded) {
+    return undefined;
+  }
+
+  const { proposalRef, hash } = decoded;
+
+  if (!proposalRef) {
+    return undefined;
+  }
+
+  return {
+    proposalRef: `${proposalRef.id}.${proposalRef.idx}`,
+    hash,
   };
 }

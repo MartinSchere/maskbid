@@ -4,6 +4,8 @@ import { getLucid } from "../lucid";
 import { WalletApi } from "use-cardano-wallet";
 import { createProposalDatum, createUnknownBidDatum } from "./datums";
 import { hashData } from "@harmoniclabs/plu-ts";
+import { UtxoWithSlot } from "@maestro-org/typescript-sdk";
+import { utxoWithSlotToUtxo } from "../utils";
 
 export async function createProposal(
   creatorAddress: string,
@@ -77,7 +79,7 @@ export async function createUnknownBid(
 
 export async function createRevealedBid(
   bidHash: string,
-  hiddenBidUtxo: UTxO,
+  hiddenBidUtxo: UtxoWithSlot,
   api: WalletApi
 ) {
   const lucid = await getLucid();
@@ -85,22 +87,24 @@ export async function createRevealedBid(
   lucid.selectWallet(api as unknown as LucidWalletApi);
 
   const bidData = localStorage.getItem(bidHash);
-  if( typeof bidData !== "string" ) throw new Error("unknown bid for haah: " + bidHash);
+
+  if (typeof bidData !== "string")
+    throw new Error("unknown bid for hash: " + bidHash);
 
   const tx = await lucid
     .newTx()
     .attachSpendingValidator({
       type: "PlutusV2",
-      script: toHex( contractBytes )
+      script: toHex(contractBytes),
     })
     .collectFrom(
-      [ hiddenBidUtxo ],
-      "00" // unused redeemer
+      [utxoWithSlotToUtxo(hiddenBidUtxo)],
+      Data.void() // unused redeemer
     )
     .payToContract(
       contractAddr,
       {
-        inline: Data.to( bidData ),
+        inline: Data.to(bidData),
       },
       {
         lovelace: BigInt(0),
