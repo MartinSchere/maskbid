@@ -69,7 +69,9 @@ const privateTender = pfn([
             // inlined
             const requesterSigned = (
                 tx.signatories.some(
-                    reqesterAddr.credential.peq
+                    punBData.$(
+                        reqesterAddr.credential.raw.fields.head
+                    ).peq
                 )
             );
 
