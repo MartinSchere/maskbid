@@ -1,5 +1,16 @@
-import { contractAddr, contractBytes } from "@/pluts_contracts/contract";
-import { WalletApi as LucidWalletApi, Data, toHex, UTxO } from "lucid-cardano";
+import {
+  contractAddr,
+  contractBytes,
+  contractCbor,
+  contractScript,
+} from "@/pluts_contracts/contract";
+import {
+  WalletApi as LucidWalletApi,
+  Data,
+  toHex,
+  UTxO,
+  applyDoubleCborEncoding,
+} from "lucid-cardano";
 import { getLucid } from "../lucid";
 import { WalletApi } from "use-cardano-wallet";
 import { createProposalDatum, createUnknownBidDatum } from "./datums";
@@ -80,9 +91,19 @@ export async function createUnknownBid(
 export async function createRevealedBid(
   bidHash: string,
   hiddenBidUtxo: UtxoWithSlot,
+  proposalRef: string,
   api: WalletApi
 ) {
   const lucid = await getLucid();
+
+  const [txHash, txIndex] = proposalRef.split(".");
+
+  const resolvedProposalRef = await lucid.provider.getUtxosByOutRef([
+    {
+      outputIndex: Number(txIndex),
+      txHash,
+    },
+  ]);
 
   lucid.selectWallet(api as unknown as LucidWalletApi);
 
@@ -95,8 +116,10 @@ export async function createRevealedBid(
     .newTx()
     .attachSpendingValidator({
       type: "PlutusV2",
-      script: toHex(contractBytes),
+      script: applyDoubleCborEncoding(toHex(contractBytes)),
     })
+    .readFrom(resolvedProposalRef)
+    .validFrom(+new Date())
     .collectFrom(
       [utxoWithSlotToUtxo(hiddenBidUtxo)],
       Data.void() // unused redeemer

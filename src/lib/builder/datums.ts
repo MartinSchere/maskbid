@@ -73,9 +73,7 @@ export function createUnknownBidDatum(
 }
 
 export function hashDatum(datum: Data) {
-  console.log("DATUM", datum);
   const cbor = Data.to(datum);
-  console.log("CBOR", cbor);
   return toHex(sha2_256(fromHex(cbor)));
 }
 
@@ -198,7 +196,6 @@ export function decodeUnkownBidDatum(datum: any) {
 }
 
 export function utxoRefFromData(data: PlutsData) {
-  console.log(data);
   if (!(data instanceof DataConstr)) return undefined;
 
   const [idConstr, idx] = data.fields;

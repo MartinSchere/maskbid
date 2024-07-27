@@ -170,7 +170,7 @@ export default function RfpRoute({ id }: { id: string }) {
         throw new Error("No wallet connected");
       }
 
-      createRevealedBid(myBids[0].hiddenBid.hash, myBids[0].utxo, api);
+      createRevealedBid(myBids[0].hiddenBid.hash, myBids[0].utxo, id, api);
     },
     onError: (error) => {
       console.error(error);
