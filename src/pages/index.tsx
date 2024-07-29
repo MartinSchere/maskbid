@@ -1,15 +1,11 @@
-import {
-  decodeProposalDatum,
-  proposalUtxoToProposal,
-} from "@/lib/builder/datums";
-import { getLucid } from "@/lib/lucid";
-import { maestroClient, maestroProvider } from "@/lib/maestro";
-import { formatLovelace, slotToDate } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { proposalUtxoToProposal } from "@/lib/builder/datums";
+import { maestroClient } from "@/lib/maestro";
+import { cn, formatLovelace } from "@/lib/utils";
 import { contractAddr } from "@/pluts_contracts/contract";
 import { useQuery } from "@tanstack/react-query";
-import { Lucid, MaestroSupportedNetworks, UTxO } from "lucid-cardano";
+import { RefreshCcw } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import useCardanoWallet from "use-cardano-wallet";
 
 interface Proposal {
@@ -48,7 +44,7 @@ function ProposalCard({
 export default function Home() {
   const { address } = useCardanoWallet();
 
-  const { data, error } = useQuery({
+  const { data, error, refetch, isRefetching } = useQuery({
     queryKey: ["proposals"],
     queryFn: async () => {
       const { data } = await maestroClient.addresses.utxosByAddress(
@@ -58,13 +54,30 @@ export default function Home() {
         }
       );
 
-      return data.flatMap((d) => proposalUtxoToProposal(d) ?? []);
+      return data.flatMap((d) => {
+        const result = proposalUtxoToProposal(d);
+
+        if (!result) return [];
+
+        if (isNaN(result.expiry.getTime())) return [];
+
+        return result ? [result] : [];
+      });
     },
   });
 
   return (
-    <div>
-      <h1 className="font-bold text-2xl mb-8">Search RFPs</h1>
+    <div className="mt-10">
+      <div className="flex items-center justify-between w-full mb-8">
+        <h1 className="font-bold text-2xl ">Browse RFPs</h1>
+
+        <Button onClick={() => refetch()}>
+          <RefreshCcw
+            className={cn("w-4 h-4 mr-2", isRefetching && "animate-spin")}
+          />{" "}
+          Refresh
+        </Button>
+      </div>
 
       <pre>{error?.message}</pre>
 

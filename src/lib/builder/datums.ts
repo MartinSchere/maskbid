@@ -46,6 +46,8 @@ function createBid(
     bidAmount,
     addressToPlutsData(bidderAddress),
     salt,
+    Buffer.from(title).toString("hex"),
+    Buffer.from(description).toString("hex"),
   ]);
 }
 
@@ -131,24 +133,34 @@ export function decodeProposalDatum(datum: any) {
 }
 
 export function decodeBidDatum(datum: any) {
+  console.log("Datum?", datum);
   if (!canBeData(datum)) return undefined;
 
   const data = forceData(datum);
 
   if (!(data instanceof DataConstr)) {
+    console.log("Not DataConstr?", data);
     return undefined;
   }
 
+  console.log("Data constr?", data.constr);
   if (Number(data.constr) !== 2) return undefined;
 
   const fields = data.fields;
 
+  console.log("Fields?", fields);
+
   const proposalRef = utxoRefFromData(fields[0]);
+
+  console.log("ProposalRef?", proposalRef);
 
   if (!(fields[1] instanceof DataI)) return undefined;
   const proposedAmount = Number(fields[1].int);
 
   const bidderAddr = addressFromPlutsData(fields[2]);
+
+  console.log("BidderAddr?", bidderAddr);
+
   if (typeof bidderAddr !== "string") return undefined;
 
   if (!(fields[3] instanceof DataB)) return undefined;
@@ -295,6 +307,7 @@ export interface Bid {
 }
 
 export function bidUtxoToBid(utxo: UtxoWithSlot): Bid | undefined {
+  console.log("Datum?", utxo.datum);
   if (!utxo.datum) {
     return undefined;
   }
@@ -302,6 +315,7 @@ export function bidUtxoToBid(utxo: UtxoWithSlot): Bid | undefined {
   const decoded = decodeBidDatum(utxo.datum.bytes);
 
   if (!decoded) {
+    console.log("Decoded?", decoded);
     return undefined;
   }
 
@@ -309,6 +323,7 @@ export function bidUtxoToBid(utxo: UtxoWithSlot): Bid | undefined {
     decoded;
 
   if (!proposalRef) {
+    console.log("ProposalRef?", proposalRef);
     return undefined;
   }
 

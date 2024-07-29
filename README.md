@@ -1,6 +1,15 @@
-# Martin's Cardano template
+# MaskBid - 2024 NMKR's Berlin Hackathon
 
-A template to bootstrap Cardano projects using Nextjs (app router), Blaze, Shadcn/ui & Maestro.
+This project was the winner of the Transparency category of 2024 NMKR's Berlin Hackathon. It consists of a commit-reveal system to make tender offers.
+
+## Main flow
+
+1. Company posts an RFP on-chain, pledging an amount to a smart contract
+2. Contractors commit their hidden bids on-chain to the RFP
+3. After the deadline is passed, contractors reveal their bids to the public
+4. The Company selects a bid, releasing the amount pledged to the bider
+
+# Running locally
 
 ## Getting started
 
@@ -9,24 +18,8 @@ A template to bootstrap Cardano projects using Nextjs (app router), Blaze, Shadc
 3. Set the environment variable `NEXT_PUBLIC_MAESTRO_API_KEY`
 4. Set the environment variable `NEXT_PUBLIC_NETWORK` to one of:
 
-- mainnet
-- preprod
-- preview
+- Mainnet
+- Preprod
+- Preview
 
 5. Run the development server: `npm run dev`
-
-## Getting a Blaze instance
-
-To get a blaze instance, there is a function exported called `getBlaze`:
-
-```ts
-import { getBlaze } from "@/lib/blaze";
-
-await getBlaze(wallet);
-```
-
-## Generating blueprint types
-
-1. cd into the `contracts` folder
-2. Build the project with `aiken build`
-3. Generate types with `npx @blaze-cardano/blueprint ./plutus.json -o src/utils/plutus.ts`

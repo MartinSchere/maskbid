@@ -139,10 +139,10 @@ export async function createRevealedBid(
     throw new Error("unknown bid for hash: " + bidHash);
 
   const txBuilder = new TxBuilder(defaultProtocolParameters, {
-    slotLengthInMilliseconds: 1000,
+    slotLengthInMilliseconds: SLOT_CONFIG_NETWORK.Preview.slotLength,
     systemStartPOSIX:
-      SLOT_CONFIG_NETWORK.Preprod.zeroTime +
-      SLOT_CONFIG_NETWORK.Preprod.zeroSlot * 1000,
+      SLOT_CONFIG_NETWORK.Preview.zeroTime +
+      SLOT_CONFIG_NETWORK.Preview.zeroSlot * 1000,
   });
 
   const utxos = (await lucid.wallet.getUtxos())
@@ -152,69 +152,55 @@ export async function createRevealedBid(
   const hiddenBid = hiddenBidUtxoToHiddenBid(hiddenBidUtxo);
   hiddenBid?.hash;
 
-  const tx = txBuilder
-    .buildSync({
-      inputs: [
-        {
-          utxo: luxidToPlutsUtxo(utxoWithSlotToUtxo(hiddenBidUtxo)),
-          inputScript: {
-            datum: "inline",
-            redeemer: new DataI(0),
-            script: contractScript,
-          },
+  const tx = txBuilder.buildSync({
+    inputs: [
+      {
+        utxo: luxidToPlutsUtxo(utxoWithSlotToUtxo(hiddenBidUtxo)),
+        inputScript: {
+          datum: "inline",
+          redeemer: new DataI(0),
+          script: contractScript,
         },
-        {
-          utxo: luxidToPlutsUtxo(utxos[1]),
-        },
-      ],
-      changeAddress: Address.fromString(await lucid.wallet.address()),
-      collaterals: [
-        luxidToPlutsUtxo(
-          (await lucid.wallet.getUtxos()).filter((u) => {
-            return Object.keys(u.assets).length === 1;
-            //   const units = Object.keys(u.assets);
-            //   if (units.length !== 1) return false;
-            //   if (units[0] !== "lovelace") return false;
-            //   if (u.assets.lovelace >= BigInt(2_000_000)) return false;
-          })[0]
-        ),
-      ],
-      readonlyRefInputs: [luxidToPlutsUtxo(resolvedProposalRef[0])],
-      invalidBefore: unixTimeToEnclosingSlot(
-        Date.now(),
-        SLOT_CONFIG_NETWORK.Preprod
+      },
+      {
+        utxo: luxidToPlutsUtxo(utxos[0]),
+      },
+    ],
+    changeAddress: Address.fromString(await lucid.wallet.address()),
+    collaterals: [
+      luxidToPlutsUtxo(
+        (await lucid.wallet.getUtxos()).filter((u) => {
+          return Object.keys(u.assets).length === 1;
+          //   const units = Object.keys(u.assets);
+          //   if (units.length !== 1) return false;
+          //   if (units[0] !== "lovelace") return false;
+          //   if (u.assets.lovelace >= BigInt(2_000_000)) return false;
+        })[0]
       ),
-      outputs: [
-        {
-          address: Address.fromString(contractAddr),
-          value: Value.lovelaces(6_137_796),
-          datum: forceData(bidData),
-        },
-      ],
-    });
+    ],
+    readonlyRefInputs: [luxidToPlutsUtxo(resolvedProposalRef[0])],
+    invalidBefore:
+      unixTimeToEnclosingSlot(Date.now(), SLOT_CONFIG_NETWORK.Preview) - 100,
+    outputs: [
+      {
+        address: Address.fromString(contractAddr),
+        value: Value.lovelaces(10_000_000),
+        datum: forceData(bidData),
+      },
+    ],
+  });
 
-    console.log(
-      JSON.stringify(
-        tx.toJson(),
-        undefined,
-        2
-      )
-    );
+  console.log(JSON.stringify(tx.toJson(), undefined, 2));
 
-  const txStr = tx
-  .toCbor()
-  .toString();
+  const txStr = tx.toCbor().toString();
 
-  const witnesses = TxWitnessSet.fromCbor(
-    await api.signTx( txStr, true )
-  );
+  const witnesses = TxWitnessSet.fromCbor(await api.signTx(txStr, true));
 
-  for( const vk of witnesses.vkeyWitnesses ?? [] )
-  {
-    tx.addVKeyWitness( vk );
+  for (const vk of witnesses.vkeyWitnesses ?? []) {
+    tx.addVKeyWitness(vk);
   }
 
-  await lucid.provider.submitTx( tx.toCbor().toString() );
+  await lucid.provider.submitTx(tx.toCbor().toString());
 }
 
 export function luxidToPlutsUtxo(hiddenBidUtxo: UTxO): PlutsUTxO {

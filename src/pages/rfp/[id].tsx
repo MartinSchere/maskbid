@@ -33,6 +33,7 @@ import { createRevealedBid, createUnknownBid } from "@/lib/builder/builder";
 import { useMemo } from "react";
 import { contractAddr } from "@/pluts_contracts/contract";
 import { ColumnDef } from "@tanstack/react-table";
+import { DataTable } from "@/components/ui/data-table";
 
 const columnsRevealedBids: ColumnDef<Bid>[] = [
   {
@@ -40,7 +41,7 @@ const columnsRevealedBids: ColumnDef<Bid>[] = [
     header: "Title",
   },
   {
-    accessorKey: "bidderAddr",
+    accessorFn: (bid) => truncateStringMiddle(bid.bidderAddr, 24),
     header: "Creator",
   },
   {
@@ -86,6 +87,7 @@ export default function RfpRoute({ id }: { id: string }) {
       const revealedBids = data
         .flatMap((utxo) => {
           const bid = bidUtxoToBid(utxo);
+          console.log("Trying to decode: ", bid);
           if (!bid) {
             return [];
           }
@@ -170,7 +172,18 @@ export default function RfpRoute({ id }: { id: string }) {
         throw new Error("No wallet connected");
       }
 
-      createRevealedBid(myBids[0].hiddenBid.hash, myBids[0].utxo, id, api);
+      await createRevealedBid(
+        myBids[0].hiddenBid.hash,
+        myBids[0].utxo,
+        id,
+        api
+      );
+    },
+    onSuccess: () => {
+      toast({
+        title: "Bid successfully revealed",
+        description: "Your bid has been successfully revealed",
+      });
     },
     onError: (error) => {
       console.error(error);
@@ -180,6 +193,9 @@ export default function RfpRoute({ id }: { id: string }) {
   const myBids = bids?.unrevealedBids.filter(
     (b) => localStorage.getItem(b.hiddenBid.hash) !== null
   );
+
+  console.log(bids?.revealedBids);
+
   return (
     <div>
       <h1 className="font-bold text-3xl mt-12">{data?.title}</h1>
@@ -349,6 +365,15 @@ export default function RfpRoute({ id }: { id: string }) {
                   </p>
                 </div>
               </div>
+            )}
+          {data &&
+            bids &&
+            +data.deadline < +new Date() &&
+            bids.revealedBids.length > 0 && (
+              <DataTable
+                columns={columnsRevealedBids}
+                data={bids.revealedBids.map((b) => b.bid)}
+              />
             )}
         </TabsContent>
       </Tabs>
